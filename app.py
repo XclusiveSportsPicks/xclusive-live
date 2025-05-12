@@ -104,10 +104,10 @@ def is_valid_pick(confidence, bet_pct, money_pct, sport):
 
 # === MAIN PICKS ROUTE ===
 @app.route('/picks', methods=['GET'])
-def get_picks():
-    raw_games = fetch_games()
-    sharp_data = fetch_sharp_percentages()
-    picks = []
+@app.route('/')
+def display_picks():
+    return render_template("picks.html", picks=[], date="Today", selected=None, selected_sport=None)
+
 
     for g in raw_games:
         if not g.get("bookmakers"): continue
