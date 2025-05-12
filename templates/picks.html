@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Xclusive Picks</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>Xclusive Sports Picks — {{ date }}</h1>
+
+    <form method="get" action="/">
+        <label for="confidence">Confidence:</label>
+        <select name="confidence" onchange="this.form.submit()">
+            <option value="">All</option>
+            <option value="high" {% if selected == 'high' %}selected{% endif %}>High (9+)</option>
+            <option value="medium" {% if selected == 'medium' %}selected{% endif %}>Medium (8–8.9)</option>
+            <option value="risky" {% if selected == 'risky' %}selected{% endif %}>Risky (&lt; 8)</option>
+        </select>
+
+        <label for="sport">Sport:</label>
+        <select name="sport" onchange="this.form.submit()">
+            <option value="">All Sports</option>
+            <option value="NBA" {% if selected_sport == 'NBA' %}selected{% endif %}>NBA</option>
+            <option value="MLB" {% if selected_sport == 'MLB' %}selected{% endif %}>MLB</option>
+            <option value="NHL" {% if selected_sport == 'NHL' %}selected{% endif %}>NHL</option>
+            <option value="Soccer" {% if selected_sport == 'Soccer' %}selected{% endif %}>Soccer</option>
+        </select>
+    </form>
+
+    <div class="container">
+        {% if picks %}
+            {% for pick in picks %}
+                <div class="card">
+                    <h2>{{ pick['Sport Icon'] }} {{ pick['Game & Bet'] }}</h2>
+                    <p><strong>Sport:</strong> {{ pick['Sport'] }}</p>
+                    <p><strong>Confidence:</strong> {{ pick['Confidence Score'] }}/10</p>
+                    <p><strong>Sharp %:</strong> {{ pick['Sharp %'] }}</p>
+                    <p><strong>Stake ($):</strong> {{ pick['Suggested Stake ($)'] }}</p>
+                    <p><strong>Why I Like It:</strong> {{ pick['Why I Like It'] }}</p>
+                    <p><strong>Prediction:</strong> {{ pick['Model Prediction'] }}</p>
+                    <p><strong>Status:</strong> {{ pick['Live Status'] }}</p>
+                    <p><strong>Score:</strong> {{ pick['Live Score'] }}</p>
+                    {% if pick['Xs Absolute Best Bet'] == '✅' %}
+                        <p class="best-bet">🔥 X's Absolute Best Bet</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        {% else %}
+            <p style="color: orange;">No picks found for this filter.</p>
+        {% endif %}
+    </div>
+</body>
+</html>
