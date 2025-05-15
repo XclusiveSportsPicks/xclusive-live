@@ -1,0 +1,24 @@
+✅ PHASE 7–8 MLB BACKEND RESTORE PLAN
+
+GOAL: Real, bias-free data engine for MLB picks using:
+- Live ESPN game feed
+- TheOddsAPI odds (1 call per slate)
+- Pitcher data from ESPN (home + away + ERA)
+- Confidence engine (win %, run diff, ERA edge)
+- Kelly Criterion stake engine (50%)
+- Sharp % filter: Money % - Bet % ≥ 30
+- “Why I Like It” generator (pitcher edge + trends)
+- 1 best pick per game only, sorted by confidence
+- Auto-flag X’s Absolute Best Bet (top pick)
+
+MODULES TO INSTALL:
+- mlb_pitchers.py
+- stake_calc.py
+- why_i_like_it.py
+
+FILES TO OVERWRITE:
+- live_fetch.py
+- ml_models/mlb_confidence.py
+
+Command to deploy to GitHub & Render:
+git add . && git commit -m "✅ Full MLB backend engine build – clean & real data only" && git push origin main

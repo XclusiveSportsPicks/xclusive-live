@@ -1,159 +1,105 @@
-# Xclusive Engine v3 — Clean Version for Live Picks + Sharp %
-
-from flask import Flask, jsonify
-import requests
-import datetime
-import os
-from bs4 import BeautifulSoup
+from flask import Flask, jsonify, render_template, send_file, request
+from flask_caching import Cache
+import pdfkit
+from datetime import datetime
+import pytz
+from live_fetch import get_all_live_games
 
 app = Flask(__name__)
+cache = Cache(app, config={'CACHE_TYPE': 'simple'})
 
-# === CONFIG ===
-API_KEY = "1256c747dab65e1c3cd504f9a3f4802b"
-SPORT = "basketball_nba"
-REGIONS = "us"
-MARKETS = "h2h"
-ODDS_API_URL = f"https://api.the-odds-api.com/v4/sports/{SPORT}/odds"
-VEGAS_INSIDER_URL = "https://www.vegasinsider.com/nba/matchups/"
+# --- Config ---
+AUTO_REFRESH_MINUTES = 10
+TARGET_TZ = pytz.timezone("US/Eastern")
 
-CONFIDENCE_THRESHOLDS = {'NBA': 8.5, 'MLB': 8.8, 'Soccer': 8.3}
-SHARP_DELTA_REQUIREMENT = {'NBA': 25, 'MLB': 35, 'Soccer': 25}
-BANKROLL = 1000  # Default bankroll for stake calculation
-
-TEAM_ALIAS = {
-    "L.A. Clippers": "LA Clippers",
-    "L.A. Lakers": "LA Lakers",
-    "New York Knickerbockers": "New York Knicks",
-    "Golden State": "Golden State Warriors"
+# --- League Alias Mapping ---
+LEAGUE_ALIASES = {
+    'EPL': 'Soccer',
+    'La Liga': 'Soccer',
+    'Serie A': 'Soccer',
+    'Bundesliga': 'Soccer',
+    'Ligue 1': 'Soccer',
+    'MLS': 'Soccer',
+    'UCL': 'Soccer',
+    'UEL': 'Soccer',
+    'NBA': 'NBA',
+    'MLB': 'MLB',
+    'NHL': 'NHL',
+    'UFC': 'UFC',
 }
 
-# === SHARP % SCRAPER ===
-def fetch_sharp_percentages():
-    try:
-        res = requests.get(VEGAS_INSIDER_URL)
-        soup = BeautifulSoup(res.text, "html.parser")
-        data = {}
-        matchups = soup.find_all("div", class_="viBox")
+# --- Per-Sport Thresholds ---
+SPORT_THRESHOLDS = {
+    'NBA': {'confidence': 7.5, 'sharp': 30},
+    'MLB': {'confidence': 7.0, 'sharp': 25},
+    'NHL': {'confidence': 7.0, 'sharp': 25},
+    'Soccer': {'confidence': 7.5, 'sharp': 30},
+    'UFC': {'confidence': 8.0, 'sharp': 35},
+}
 
-        for block in matchups:
-            teams = block.find_all("a", class_="matchupLink")
-            percents = block.find_all("td", class_="cellCenter")
+# --- Utility ---
+def calculate_sharp_percent(bet_pct, money_pct):
+    return round(money_pct - bet_pct)
 
-            if len(teams) >= 2 and len(percents) >= 6:
-                team1 = teams[0].get_text(strip=True)
-                team2 = teams[1].get_text(strip=True)
+# --- Core Fetch & Filter Logic ---
+def fetch_picks():
+    today = datetime.now(TARGET_TZ).date()
+    picks = []
 
-                bet_pct = int(percents[1].get_text(strip=True).replace('%', ''))
-                money_pct = int(percents[4].get_text(strip=True).replace('%', ''))
+    for item in get_all_live_games():
+        try:
+            raw_league = item['league']
+            normalized_league = LEAGUE_ALIASES.get(raw_league)
+            if not normalized_league:
+                continue
 
-                team1 = TEAM_ALIAS.get(team1, team1)
-                team2 = TEAM_ALIAS.get(team2, team2)
+            game_time = datetime.fromisoformat(item['match_time']).astimezone(TARGET_TZ)
+            if game_time.date() != today:
+                continue
 
-                data[team1] = {"bet": bet_pct, "money": money_pct}
-                data[team2] = {"bet": 100 - bet_pct, "money": 100 - money_pct}
-        return data
-    except Exception as e:
-        print("Error scraping sharp data:", e)
-        return {}
+            sharp_delta = calculate_sharp_percent(item['bet_pct'], item['money_pct'])
+            thresholds = SPORT_THRESHOLDS[normalized_league]
 
-# === ODDS FETCHER ===
-def fetch_games():
-    try:
-        res = requests.get(ODDS_API_URL, params={
-            "apiKey": API_KEY,
-            "regions": REGIONS,
-            "markets": MARKETS,
-            "oddsFormat": "american"
-        })
-        return res.json()
-    except Exception as e:
-        print("Error fetching odds:", e)
-        return []
+            if sharp_delta >= thresholds['sharp'] and item['confidence'] >= thresholds['confidence']:
+                picks.append({
+                    'game': item['game'],
+                    'league': raw_league,  # Show original label on frontend
+                    'pick': item['bet'],
+                    'odds': item['odds'],
+                    'confidence': item['confidence'],
+                    'sharp_percent': sharp_delta,
+                    'status': item['status'],
+                    'result': item.get('final_result', ''),
+                    'match_time': game_time.strftime('%I:%M %p')
+                })
+        except Exception as e:
+            print(f"[Error] {e} for item: {item}")
 
-# === CONFIDENCE CALCULATOR ===
-def calculate_confidence(odds_val, money_pct):
-    try:
-        base = 7.5 + (money_pct - 50) / 10
-        if odds_val < -200:
-            base += 0.5
-        elif odds_val > 100:
-            base -= 0.3
-        return round(min(base, 9.9), 2)
-    except:
-        return 8.5
+    picks = sorted(picks, key=lambda x: x['confidence'], reverse=True)
+    return picks
 
-# === KELLY STAKE CALCULATOR ===
-def calculate_kelly_stake(prob_win, odds, bankroll=BANKROLL):
-    try:
-        b = abs(odds) / 100 if odds < 0 else odds / 100
-        q = 1 - prob_win
-        kelly = ((b * prob_win - q) / b)
-        stake = round(0.5 * kelly * bankroll, 2)
-        return stake if stake > 0 else 0
-    except:
-        return 0
-
-# === VALID PICK CHECKER ===
-def is_valid_pick(confidence, bet_pct, money_pct, sport):
-    sharp_delta = money_pct - bet_pct
-    print(f"Conf: {confidence}, Sharp Delta: {sharp_delta}, Bet %: {bet_pct}, Money %: {money_pct}")
-    return (
-        confidence >= CONFIDENCE_THRESHOLDS[sport] and
-        sharp_delta >= SHARP_DELTA_REQUIREMENT[sport]
-    )
-
-# === MAIN PICKS ROUTE ===
-@app.route('/picks', methods=['GET'])
+# --- Routes ---
 @app.route('/')
-def display_picks():
-    return render_template("picks.html", picks=[], date="Today", selected=None, selected_sport=None)
+def home():
+    league_filter = request.args.get('league')
+    picks = fetch_picks()
+    if league_filter:
+        picks = [p for p in picks if p['league'].lower() == league_filter.lower()]
+    return render_template('index.html', picks=picks, now=datetime.now(TARGET_TZ), league_filter=league_filter)
 
+@app.route('/api/auto-picks')
+@cache.cached(timeout=AUTO_REFRESH_MINUTES * 60, key_prefix='auto_picks')
+def api_auto_picks():
+    return jsonify({'picks': fetch_picks(), 'updated': datetime.now(TARGET_TZ).isoformat()})
 
-    for g in raw_games:
-        if not g.get("bookmakers"): continue
-
-        team_1 = g["home_team"]
-        team_2 = g["away_team"]
-        game_name = f"{team_2} vs {team_1}"
-        pick = f"{team_1} ML"
-        team_norm = TEAM_ALIAS.get(team_1, team_1)
-
-        sharp_home = sharp_data.get(team_norm)
-        if not sharp_home:
-            print(f"No sharp % data for: {team_norm} — using test default")
-            sharp_home = {"bet": 35, "money": 70}
-
-        bet_pct = sharp_home["bet"]
-        money_pct = sharp_home["money"]
-
-        odds = -120  # Default fallback
-        for book in g["bookmakers"]:
-            for market in book["markets"]:
-                if market["key"] == "h2h":
-                    for outcome in market["outcomes"]:
-                        if outcome["name"] == team_1:
-                            odds = outcome["price"]
-
-        confidence = calculate_confidence(odds, money_pct)
-        prob_win = min(confidence / 10, 0.99)
-        stake = calculate_kelly_stake(prob_win, odds)
-
-        if is_valid_pick(confidence, bet_pct, money_pct, "NBA"):
-            picks.append({
-                'Game & Bet': f"{game_name} — {pick}",
-                'Confidence Score': confidence,
-                'Sharp %': f"{bet_pct}% bets / {money_pct}% money",
-                'Suggested Stake ($)': stake,
-                'Why I Like It': 'Live sharp % edge + confident model match.',
-                'Model Prediction': f"{team_1} wins by {int((confidence - 8.3) * 3)}+",
-                'Xs Absolute Best Bet': '✅'
-            })
-
-    return jsonify({
-        'date': datetime.date.today().isoformat(),
-        'picks': picks
-    })
+@app.route('/export/pdf')
+def export_pdf():
+    picks = fetch_picks()
+    rendered = render_template('pdf_template.html', picks=picks, now=datetime.now(TARGET_TZ))
+    pdf_path = 'xclusive_daily_picks.pdf'
+    config = pdfkit.configuration(wkhtmltopdf='/usr/bin/wkhtmltopdf')  # Adjust path if needed
+    pdfkit.from_string(rendered, pdf_path, configuration=config)
+    return send_file(pdf_path, as_attachment=True)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(debug=True)
