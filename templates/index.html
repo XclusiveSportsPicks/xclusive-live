@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Xclusive Sports Picks</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo.png') }}">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 30px;
+            background-color: #111;
+            color: #fff;
+        }
+        .header-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .header-bar img {
+            height: 60px;
+        }
+        .menu {
+            display: flex;
+            gap: 20px;
+        }
+        .menu a {
+            color: #d4af37;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .export-btn {
+            margin-left: 20px;
+            background-color: #d4af37;
+            color: #111;
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .pick {
+            border-bottom: 1px solid #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .pick h2 {
+            color: #d4af37;
+        }
+        .label {
+            font-weight: bold;
+            color: #aaa;
+        }
+        .best-bet {
+            background-color: #222;
+            border-left: 4px solid #d4af37;
+            padding: 10px;
+        }
+        .footer {
+            margin-top: 50px;
+            font-size: 0.85em;
+            color: #888;
+            text-align: center;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #555;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bar">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        <div class="menu">
+            <a href="/">HOME</a>
+            <a href="/?league=MLB">MLB</a>
+            <a href="/?league=NBA">NBA</a>
+            <a href="/?league=Soccer">SOCCER</a>
+            <a href="/?league=NHL">NHL</a>
+            <a href="/?league=UFC">UFC</a>
+            <a href="/export/pdf" class="export-btn">📄 Export PDF</a>
+        </div>
+    </div>
+
+    {% for pick in picks %}
+        <div class="pick{% if loop.first %} best-bet{% endif %}">
+            <h2>{{ pick.game }}</h2>
+            <p><span class="label">Pick:</span> {{ pick.pick }}</p>
+            <p><span class="label">Odds:</span> {{ pick.odds }}</p>
+            <p><span class="label">Confidence:</span> {{ pick.confidence }}/10</p>
+            <p><span class="label">Sharp %:</span> {{ pick.sharp_percent }}%</p>
+            <p><span class="label">Tier:</span>
+            {% if pick.confidence >= 8.5 %}<span style="color:limegreen">High</span>
+            {% elif pick.confidence >= 7.5 %}<span style="color:gold">Medium</span>
+            {% else %}<span style="color:orangered">Risky</span>
+            {% endif %}</p>
+            <p><span class="label">Edge:</span>
+            {% if pick.sharp_percent >= 30 %}Sharp Side{% else %}Public Fade{% endif %}</p>
+            <p><span class="label">Status:</span> {{ pick.status }}</p>
+            {% if pick.result %}
+                <p><span class="label">Result:</span> {{ pick.result }}</p>
+            {% endif %}
+            {% if loop.first %}<p><strong>🏆 X’s Absolute Best Bet</strong></p>{% endif %}
+        </div>
+    {% endfor %}
+
+    <h2 style="margin-top:40px; color:#d4af37;">📊 Daily Pick Summary</h2>
+    <table>
+        <tr>
+            <th>Game</th>
+            <th>Pick</th>
+            <th>Odds</th>
+            <th>Confidence</th>
+            <th>Sharp %</th>
+            <th>Status</th>
+            <th>Result</th>
+        </tr>
+        {% for pick in picks %}
+        <tr>
+            <td>{{ pick.game }}</td>
+            <td>{{ pick.pick }}</td>
+            <td>{{ pick.odds }}</td>
+            <td>{{ pick.confidence }}</td>
+            <td>{{ pick.sharp_percent }}%</td>
+            <td>{{ pick.status }}</td>
+            <td>{{ pick.result if pick.result else '-' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="footer">
+        Last updated: {{ now.strftime('%Y-%m-%d %H:%M UTC') }} |
+        Powered by Xclusive Sports Picks
+    </div>
+</body>
+</html>

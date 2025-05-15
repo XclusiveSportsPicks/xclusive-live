@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Xclusive Daily Picks Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 40px;
+            color: #000;
+        }
+        h1 {
+            text-align: center;
+            color: #d4af37;
+        }
+        .pick {
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+        }
+        .header {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .label {
+            font-weight: bold;
+        }
+        .best-bet {
+            background: #fffae6;
+            border: 2px solid #d4af37;
+            padding: 10px;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 30px;
+            font-size: 0.95em;
+        }
+        th, td {
+            padding: 8px;
+            border-bottom: 1px solid #bbb;
+            text-align: left;
+        }
+        .footer {
+            margin-top: 60px;
+            font-size: 0.9em;
+            color: #777;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>Xclusive Daily Picks Report</h1>
+
+    {% for pick in picks %}
+        <div class="pick{% if loop.first %} best-bet{% endif %}">
+            <div class="header">{{ pick.game }}</div>
+            <p><span class="label">Pick:</span> {{ pick.pick }}</p>
+            <p><span class="label">Odds:</span> {{ pick.odds }}</p>
+            <p><span class="label">Confidence:</span> {{ pick.confidence }}/10</p>
+            <p><span class="label">Sharp %:</span> {{ pick.sharp_percent }}%</p>
+            <p><span class="label">Tier:</span>
+            {% if pick.confidence >= 8.5 %}High
+            {% elif pick.confidence >= 7.5 %}Medium
+            {% else %}Risky
+            {% endif %}</p>
+            <p><span class="label">Edge:</span>
+            {% if pick.sharp_percent >= 30 %}Sharp Side{% else %}Public Fade{% endif %}</p>
+            <p><span class="label">Status:</span> {{ pick.status }}</p>
+            {% if pick.result %}<p><span class="label">Result:</span> {{ pick.result }}</p>{% endif %}
+            {% if loop.first %}<p><strong>🏆 X’s Absolute Best Bet</strong></p>{% endif %}
+        </div>
+    {% endfor %}
+
+    <h2 style="color:#d4af37; margin-top:40px;">📊 Daily Pick Summary</h2>
+    <table>
+        <tr>
+            <th>Game</th>
+            <th>Pick</th>
+            <th>Odds</th>
+            <th>Confidence</th>
+            <th>Sharp %</th>
+            <th>Status</th>
+            <th>Result</th>
+        </tr>
+        {% for pick in picks %}
+        <tr>
+            <td>{{ pick.game }}</td>
+            <td>{{ pick.pick }}</td>
+            <td>{{ pick.odds }}</td>
+            <td>{{ pick.confidence }}</td>
+            <td>{{ pick.sharp_percent }}%</td>
+            <td>{{ pick.status }}</td>
+            <td>{{ pick.result if pick.result else '-' }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <div class="footer">
+        Report generated on {{ now.strftime('%Y-%m-%d %I:%M %p EST') }} |
+        Powered by Xclusive Sports Picks
+    </div>
+</body>
+</html>
