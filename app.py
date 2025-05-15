@@ -3,7 +3,7 @@ from flask_caching import Cache
 import pdfkit
 from datetime import datetime
 import pytz
-from live_fetch import get_all_live_games
+from XclusiveApp.live_fetch import get_all_live_games
 
 app = Flask(__name__)
 cache = Cache(app, config={'CACHE_TYPE': 'simple'})
